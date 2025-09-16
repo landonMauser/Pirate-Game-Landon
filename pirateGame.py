@@ -4,14 +4,14 @@ from pygame.sprite import *
 import pygame, sys, os, random
 from pygame.locals import *
 
-# Resource path helper (for EXE builds later)
-def resource_path(myPath):
+def resource_path(my_path):
     try:
-        basePath = sys._MEIPASS
+        # When bundled by PyInstaller, files are extracted to a temp folder
+        base_path = sys._MEIPASS
     except Exception:
-        basePath = r"C:\Genral school work\userInterface\pirateGame"
-    return os.path.join(basePath, myPath)
-
+        # When running normally, use the folder of this script
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_path, my_path)
 # Init
 pygame.init()
 gameWidth, gameHeight = [pygame.display.Info().current_w, pygame.display.Info().current_h]
@@ -20,20 +20,20 @@ pygame.display.set_caption("There be treasure!!!")
 clock = pygame.time.Clock()
 
 # Backgrounds
-backgroundGame = pygame.image.load(resource_path("background10.png")).convert()
+backgroundGame = pygame.image.load(resource_path("resources/background10.png")).convert()
 backgroundGame = pygame.transform.scale(backgroundGame, (gameWidth, gameHeight))
 
-backgroundMenu = pygame.image.load(resource_path("boatCamp2.png")).convert()
+backgroundMenu = pygame.image.load(resource_path("resources/boatCamp2.png")).convert()
 backgroundMenu = pygame.transform.scale(backgroundMenu, (gameWidth, gameHeight))
 
-backgroundShop = pygame.image.load(resource_path("boatCamp1.png")).convert()
+backgroundShop = pygame.image.load(resource_path("resources/boatCamp1.png")).convert()
 backgroundShop = pygame.transform.scale(backgroundShop, (gameWidth, gameHeight))
 
 # Sprite
-shipSprite = pygame.image.load(resource_path("piratePixelShip1.png")).convert_alpha()
+shipSprite = pygame.image.load(resource_path("resources/piratePixelShip1.png")).convert_alpha()
 shipSprite = pygame.transform.scale(shipSprite, (90, 90))
 
-shipSprite3 = pygame.image.load(resource_path("piratePixelShip3.png")).convert_alpha()
+shipSprite3 = pygame.image.load(resource_path("resources/piratePixelShip3.png")).convert_alpha()
 shipSprite3 = pygame.transform.scale(shipSprite3, (90, 90))
 
 # Colors
@@ -49,9 +49,10 @@ buttonfont = pygame.font.SysFont('Arial', 32, bold=True)
 headerText = headerfont.render("Whack 'A pirateShip!", True, black, pink)
 headerRect = headerText.get_rect(center=(gameWidth / 2, 100))
 
-playButtonNormal = buttonfont.render(" Play ", True, black, pink)
-playButtonHover = buttonfont.render(" Play ", True, red, pink)
-playButtonRect = playButtonNormal.get_rect(topleft=(gameWidth / 2 - 60, 400))
+
+startButton = pygame.image.load(resource_path("resources/startButton1.png")).convert_alpha()
+startButton = pygame.transform.scale(startButton, (200, 100)) 
+playButtonRect = startButton.get_rect(topleft=(gameWidth / 2 - 120, 300))
 
 quitButtonNormal = buttonfont.render(" Quit ", True, black, pink)
 quitButtonHover = buttonfont.render(" Quit ", True, red, pink)
@@ -99,9 +100,18 @@ def draw_menu():
     titleRect = title.get_rect(center=(gameWidth / 2, 200))
     screen.blit(title, titleRect)
 
-    playBtnText = playButtonHover if playButtonRect.collidepoint(pygame.mouse.get_pos()) else playButtonNormal
-    pygame.draw.rect(screen, white, playButtonRect)
-    screen.blit(playBtnText, playButtonRect)
+    
+    mouse_pos = pygame.mouse.get_pos()
+    if playButtonRect.collidepoint(mouse_pos):
+        # Grow 10% larger on hover
+        hover_img = pygame.transform.scale(startButton, (int(300),int(150)))
+
+        # Re-center so it grows outward evenly
+        hover_rect = hover_img.get_rect(center=playButtonRect.center)
+        screen.blit(hover_img, hover_rect)
+    else:
+        # Normal size
+        screen.blit(startButton, playButtonRect)
     
     shopBtnText = shopButtonHover if shopButtonRect.collidepoint(pygame.mouse.get_pos()) else shopButtonNormal
     pygame.draw.rect(screen, white, shopButtonRect)
@@ -119,9 +129,10 @@ def draw_game(dt):
     boats.update(dt)
     boats.draw(screen)
 
-    quitBtnText = quitButtonHover if quitButtonRect.collidepoint(pygame.mouse.get_pos()) else quitButtonNormal
-    pygame.draw.rect(screen, white, quitButtonRect)
-    screen.blit(quitBtnText, quitButtonRect)
+    backBtnText = backButtonHover if backButtonRect.collidepoint(pygame.mouse.get_pos()) else backButtonNormal
+    pygame.draw.rect(screen, white, backButtonRect)
+    screen.blit(backBtnText, backButtonRect)
+
 
 
 def draw_shop():
@@ -149,7 +160,9 @@ while True:
 
         if current_page == MENU:
             if event.type == pygame.MOUSEBUTTONDOWN:
-                if playButtonRect.collidepoint(pygame.mouse.get_pos()):
+                if quitButtonRect.collidepoint(pygame.mouse.get_pos()):
+                    pygame.quit(); sys.exit()
+                elif playButtonRect.collidepoint(pygame.mouse.get_pos()):
                     current_page = GAME
                 elif shopButtonRect.collidepoint(pygame.mouse.get_pos()):
                   current_page = SHOP
@@ -159,7 +172,7 @@ while True:
         elif current_page == GAME:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if quitButtonRect.collidepoint(pygame.mouse.get_pos()):
-                    pygame.quit(); sys.exit()
+                    current_page = MENU
             elif event.type == SPAWN_EVENT:
                 y = random.randint(50, gameHeight - 100)
                 boat = PirateShip(y)
