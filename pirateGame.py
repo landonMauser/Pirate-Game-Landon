@@ -29,6 +29,10 @@ backgroundMenu = pygame.transform.scale(backgroundMenu, (gameWidth, gameHeight))
 backgroundShop = pygame.image.load(resource_path("resources/boatCamp1.png")).convert()
 backgroundShop = pygame.transform.scale(backgroundShop, (gameWidth, gameHeight))
 
+
+# audio
+audioTest = pygame.mixer.Sound('audioTest.mp3')
+
 # Sprite
 shipSprite = pygame.image.load(resource_path("resources/piratePixelShip1.png")).convert_alpha()
 shipSprite = pygame.transform.scale(shipSprite, (90, 90))
@@ -171,12 +175,23 @@ while True:
 
         elif current_page == GAME:
             if event.type == pygame.MOUSEBUTTONDOWN:
-                if quitButtonRect.collidepoint(pygame.mouse.get_pos()):
+                mouse_pos = pygame.mouse.get_pos()
+
+                if quitButtonRect.collidepoint(mouse_pos):
+                    pygame.mixer.stop()
                     current_page = MENU
+
+                for boat in boats:
+                    if boat.rect.collidepoint(mouse_pos):
+                        boat.kill() 
+                        pygame.mixer.stop()
+                        audioTest.play()
+
             elif event.type == SPAWN_EVENT:
                 y = random.randint(50, gameHeight - 100)
                 boat = PirateShip(y)
                 boats.add(boat)
+
 
         elif current_page == SHOP:
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -191,4 +206,3 @@ while True:
         draw_shop()
 
     pygame.display.update()
-
