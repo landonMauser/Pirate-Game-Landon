@@ -204,6 +204,7 @@ def draw_shop():
     screen.blit(backBtnText, backButtonRect)
 
 
+
 # --- Main Loop ---
 while True:
     dt = min(clock.tick(60) / 1000, 0.05)
@@ -232,6 +233,7 @@ while True:
                 if backButtonRect.collidepoint(mouse_pos):
                     #pygame.mixer.stop()
                     boats.empty()
+                    import score
                     current_page = MENU
 
                 for boat in boats:
@@ -253,8 +255,6 @@ while True:
                 y = random.randint(gameHeight // 3, gameHeight - margin)
                 boat = PirateShip2(y)
                 boats.add(boat)
-
-
 
 
         elif current_page == SHOP:
