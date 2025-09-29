@@ -1,15 +1,13 @@
 from peewee import *
 import pygame, sys, os, random
+from pygame import *
 from pygame.font import Font
 from pygame.locals import *
 from tkinter import messagebox
 
-def scorePage(player_score=None, player_name=None, screen=None):
-    """
-    Show the high-score screen.
-    - player_score: int or None. If given, it’s used to decide if we prompt for adding a new high score.
-    - player_name: str or None. If given together with player_score, it will insert the score immediately.
-    - screen: optional Pygame surface. If None, a full-screen window is created.
+def scorePage(killed=None, screen=None):
+    """Display top scores and optionally add the player's new score.
+       Pass the player's score as `killed`.
     """
 
     # ---------- Database ----------
@@ -35,19 +33,21 @@ def scorePage(player_score=None, player_name=None, screen=None):
         messagebox.showwarning("Error", "No database connection")
         return
 
-    # Fetch current top 3
     scores = ["", "", ""]
     scoreVals = [0, 0, 0]
+
     cursor = db.execute_sql(
-        "SELECT scorename, scoreval FROM scores ORDER BY scoreval DESC LIMIT 3"
+        "SELECT scorename, scoreval FROM scores "
+        "ORDER BY scoreval DESC LIMIT 3"
     )
     for i, row in enumerate(cursor.fetchall()):
         scores[i] = f"{row[0]} {row[1]}"
         scoreVals[i] = int(row[1])
+
     db.close()
 
     # ---------- Pygame Setup ----------
-    pygame.init()  # <-- add this line
+    pygame.init()                 # <-- parentheses were missing
     pygame.font.init()
     if screen is None:
         gameWidth, gameHeight = (
@@ -73,30 +73,14 @@ def scorePage(player_score=None, player_name=None, screen=None):
     noRect = pygame.Rect(buttonx + 300, buttony, buttonw, buttonh)
 
     # ---------- State ----------
-    highestscore = scoreVals[0] if scoreVals[0] else 0
-    thirdhighest = scoreVals[2] if scoreVals[2] else 0
-
     addingScore = False
     doneAdding = False
     initials = ["_", "_", "_"]
     initial_index = 0
+    highestscore = scoreVals[0] if scoreVals[0] else 0
+    thirdhighest = scoreVals[2] if scoreVals[2] else 0
+
     clock = pygame.time.Clock()
-
-    # Decide if we should prompt to add score automatically
-    if player_score is not None and player_score > thirdhighest:
-        addingScore = True
-
-    # If both score and name given: insert and skip interactive adding
-    if player_score is not None and player_name:
-        try:
-            db.connect()
-            db.execute_sql(
-                "INSERT INTO scores(scorename, scoreval) VALUES (%s, %s)",
-                (player_name, player_score),
-            )
-        finally:
-            db.close()
-        doneAdding = True  # we still show the screen but skip input
 
     # ---------- Helpers ----------
     def addScore(name, score):
@@ -117,38 +101,66 @@ def scorePage(player_score=None, player_name=None, screen=None):
             if event.type == QUIT:
                 running = False
 
-            elif event.type == pygame.MOUSEBUTTONDOWN and not doneAdding:
-                if yesRect.collidepoint(event.pos):
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if yesRect.collidepoint(event.pos) and not doneAdding:
                     addingScore = True
                 elif noRect.collidepoint(event.pos):
                     running = False
 
-            elif addingScore and not doneAdding and event.type == pygame.KEYUP:
-                if event.unicode.isalpha() and initial_index < 3:
+            elif addingScore and event.type == pygame.KEYUP and event.unicode.isalpha():
+                if initial_index < 3:
                     initials[initial_index] = event.unicode.upper()
                     initial_index += 1
-                if initial_index == 3 and player_score is not None:
-                    addScore("".join(initials), player_score)
+                if initial_index == 3:
+                    # Use the passed-in killed score (fallback to at least 1 above third place)
+                    newScore = killed if killed is not None else random.randint(thirdhighest + 1,
+                                                                                highestscore + 4)
+                    addScore("".join(initials), newScore)
                     doneAdding = True
 
         # ---------- Drawing ----------
         screen.fill(pink)
 
+        # Header
         headerText = headerfont.render(
-            "High Scores", True, black, pink
+            "Your score is in the top 3! Add to high scores?",
+            True,
+            black,
+            pink,
         )
-        screen.blit(headerText, headerText.get_rect(center=(350, 40)))
+        screen.blit(headerText, headerText.get_rect(center=(350, 50)))
 
         subheader = smallfont.render("Current Top 3", True, black, pink)
-        screen.blit(subheader, subheader.get_rect(center=(350, 100)))
+        screen.blit(subheader, subheader.get_rect(center=(350, 150)))
 
         for i, s in enumerate(scores):
             txt = infofont.render(s, True, red, pink)
-            screen.blit(txt, txt.get_rect(center=(350, 130 + i * 20)))
+            screen.blit(txt, txt.get_rect(center=(350, 170 + i * 20)))
 
-        # Show prompt only if we have a score to add and we haven’t finished
-        if player_score is not None and not doneAdding:
-            prompt = "Your score is in the top 3! Add it?"
-            promptText = smallfont.render(prompt, True, black, pink)
-        
-scorePage()
+        if addingScore:
+            instr = smallfont.render("Enter your 3 initials", True, black, pink)
+            screen.blit(instr, instr.get_rect(center=(350, 250)))
+            for i, ch in enumerate(initials):
+                t = infofont.render(ch, True, black, white)
+                screen.blit(t, t.get_rect(center=(330 + i * 15, 280)))
+                draw_button(noRect, "Back", red if noRect.collidepoint(m) else black)
+
+
+        if not doneAdding:
+            # draw buttons
+            def draw_button(rect, text, hover):
+                border = 30
+                inner = rect.inflate(-10, -10)
+                pygame.draw.rect(screen, red, rect, border_radius=border)
+                pygame.draw.rect(screen, white, inner, border_radius=border - 5)
+                t = buttonfont.render(text, True, hover, white)
+                screen.blit(t, t.get_rect(center=inner.center))
+
+            m = pygame.mouse.get_pos()
+            draw_button(yesRect, "Yes", red if yesRect.collidepoint(m) else black)
+            draw_button(noRect, "No thanks", red if noRect.collidepoint(m) else black)
+
+
+        pygame.display.flip()
+
+    return

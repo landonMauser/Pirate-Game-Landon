@@ -5,7 +5,7 @@ a = Analysis(
     ['pirateGame.py'],
     pathex=[],
     binaries=[],
-    datas=[('C:\\Genral school work\\userInterface\\pirateGame\\resources', 'resources')],
+    datas=[('resources', 'resources')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -35,5 +35,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['C:\\Genral school work\\userInterface\\pirateGame\\resources\\misc1.ico'],
+    icon=['resources\\misc1.ico'],
 )
