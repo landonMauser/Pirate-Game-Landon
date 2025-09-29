@@ -1,16 +1,15 @@
 from pygame import *
+from peewee import *
 from pygame.font import Font
 from pygame.sprite import *
 import pygame, sys, os, random
 from pygame.locals import *
-#from score import score
+from score import scorePage
 
 def resource_path(my_path):
     try:
-        # When bundled by PyInstaller, files are extracted to a temp folder
         base_path = sys._MEIPASS
     except Exception:
-        # When running normally, use the folder of this script
         base_path = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(base_path, my_path)
 # Init
@@ -33,6 +32,9 @@ backgroundShop = pygame.transform.scale(backgroundShop, (gameWidth, gameHeight))
 
 # audio
 boom1 = pygame.mixer.Sound(resource_path("resources/boom1.mp3"))
+boom2 = pygame.mixer.Sound(resource_path("resources/boom2.mp3"))
+boom3 = pygame.mixer.Sound(resource_path("resources/boom3.mp3"))
+
 
 # Sprite
 shipSprite = pygame.image.load(resource_path("resources/piratePixelShip1.png")).convert_alpha()
@@ -44,21 +46,35 @@ shipSprite3 = pygame.transform.scale(shipSprite3, (90, 90))
 shipSprite2 = pygame.image.load(resource_path("resources/piratePixelShip2.png")).convert_alpha()
 shipSprite2 = pygame.transform.scale(shipSprite2, (90, 90))
 
+flyShip = pygame.image.load(resource_path("resources/dutch.png")).convert_alpha()
+flyShip = pygame.transform.scale(flyShip, (200, 200))
+
+flyShip2 = pygame.image.load(resource_path("resources/ghostShip1.png")).convert_alpha()
+flyShip2 = pygame.transform.scale(flyShip2, (200, 200))
+
 scoreBoard = pygame.image.load(resource_path("resources/scorePlate.png")).convert_alpha()
 scoreBoard = pygame.transform.scale(scoreBoard, (200, 200))
-scoreBoardRect = scoreBoard.get_rect(topleft=(1200, 50))
+scoreBoardRect = scoreBoard.get_rect(topleft=(gameWidth-400, 40))
 
 startButton = pygame.image.load(resource_path("resources/startButton1.png")).convert_alpha()
-startButton = pygame.transform.scale(startButton, (250, 125)) 
-playButtonRect = startButton.get_rect(topleft=(gameWidth / 2 - 120, 300))
+startButton = pygame.transform.scale(startButton, (300, 150)) 
+playButtonRect = startButton.get_rect(topleft=(gameWidth / 2 - 120, 500))
 
 quitButton = pygame.image.load(resource_path("resources/quitButton2.png")).convert_alpha()
-quitButton = pygame.transform.scale(quitButton, (200, 100))
-quitButtonRect = quitButton.get_rect(topleft=(gameWidth / 2 - 90, 750))
+quitButton = pygame.transform.scale(quitButton, (300, 150))
+quitButtonRect = quitButton.get_rect(topleft=(gameWidth / 2 - 110, 900))
 
 shopButton = pygame.image.load(resource_path("resources/shopButton2.png")).convert_alpha()
 shopButton = pygame.transform.scale(shopButton, (200, 200))
-shopButtonRect = shopButton.get_rect(topleft=(gameWidth / 2 - 90, 480))
+shopButtonRect = shopButton.get_rect(topleft=(gameWidth / 2 - 90, 680))
+
+storyButton = pygame.image.load(resource_path("resources/storyMode.png")).convert_alpha()
+storyButton = pygame.transform.scale(storyButton, (330, 165))
+storyButtonRect = storyButton.get_rect(topleft=(gameWidth / 2 - 130, 300))
+
+settingsButton = pygame.image.load(resource_path("resources/settingsButton.png")).convert_alpha()
+settingsButton = pygame.transform.scale(settingsButton, (250, 170))
+settingsButtonRect = settingsButton.get_rect(topleft=(230, 100))
 
 # Colors
 pink = (255, 157, 195)
@@ -73,14 +89,16 @@ buttonfont = pygame.font.SysFont('Arial', 40, bold=True)
 headerText = headerfont.render("Whack 'A pirateShip!", True, black, pink)
 headerRect = headerText.get_rect(center=(gameWidth / 2, 100))
 
-backButtonNormal = buttonfont.render(" Back ", True, black, pink)
-backButtonHover = buttonfont.render(" Back ", True, red, pink)
-backButtonRect = backButtonNormal.get_rect(topleft=(gameWidth / 2 - 60, 750))
+# Back button image
+backButtonImg = pygame.image.load(resource_path("resources/backButton1.png")).convert_alpha()
+backButtonImg = pygame.transform.scale(backButtonImg, (200, 150)) 
+backButtonRect = backButtonImg.get_rect(topleft=(gameWidth / 2 - 100, 750))
+
 
 scoreText = buttonfont.render("Score:     ", True, black)
 scoreRect = scoreText.get_rect()
-scorex = 1298
-scorey = 200
+scorex = gameWidth - 300
+scorey = gameHeight / 6.4
 scoreRect.center = (scorex,scorey)
 pygame.draw.rect(screen,True,scoreRect)
 
@@ -115,22 +133,34 @@ class PirateShip2(pygame.sprite.Sprite):
 
     def update(self, dt):
         self.rect.x -= int(self.speed * dt)
-        if self.rect.right < 500:
+        if self.rect.right < 300:
             self.kill()
 
+class pirateFlyShip(pygame.sprite.Sprite):
+    def __init__(self, y):
+        super().__init__()
+        if random.random() < 0.01:
+            self.image = flyShip
+        else:
+            self.image = flyShip2
+        self.rect = self.image.get_rect(topright=(gameWidth, y))
+        self.speed = random.randint(100, 200) 
 
-
+    def update(self, dt):
+        self.rect.x -= int(self.speed * dt)
+        if self.rect.right < 300:
+            self.kill()
 
 boats = pygame.sprite.Group()
-
-
-#spawning
 
 SPAWN_EVENT = pygame.USEREVENT + 1
 pygame.time.set_timer(SPAWN_EVENT, 2300)  
 
 SPAWN_EVENT2 = pygame.USEREVENT + 2
 pygame.time.set_timer(SPAWN_EVENT2, 3000)  
+
+SPAWN_EVENT3 = pygame.USEREVENT + 3
+pygame.time.set_timer(SPAWN_EVENT3, 4000)  
 
 def draw_menu():
     screen.blit(backgroundMenu, (0, 0))
@@ -141,9 +171,7 @@ def draw_menu():
     
     mouse_pos = pygame.mouse.get_pos()
     if playButtonRect.collidepoint(mouse_pos):
-
-        hover = pygame.transform.scale(startButton, (int(300),int(150)))
-
+        hover = pygame.transform.scale(startButton, (int(350),int(175)))
         hover_rect = hover.get_rect(center=playButtonRect.center)
         screen.blit(hover, hover_rect)
 
@@ -151,13 +179,28 @@ def draw_menu():
         screen.blit(startButton, playButtonRect)
 
     if quitButtonRect.collidepoint(pygame.mouse.get_pos()):
-        hover = pygame.transform.scale(quitButton, (220, 110))
+        hover = pygame.transform.scale(quitButton, (350, 175))
         hover_rect = hover.get_rect(center=quitButtonRect.center)
         screen.blit(hover, hover_rect)
         
     else:
         screen.blit(quitButton, quitButtonRect)
-    
+
+    if storyButtonRect.collidepoint(pygame.mouse.get_pos()):
+        hover = pygame.transform.scale(storyButton, (350, 175))
+        hover_rect = hover.get_rect(center=storyButtonRect.center)
+        screen.blit(hover, hover_rect)
+        
+    else:
+        screen.blit(storyButton, storyButtonRect)
+
+    if settingsButtonRect.collidepoint(pygame.mouse.get_pos()):
+        hover = pygame.transform.scale(settingsButton, (220, 175))
+        hover_rect = hover.get_rect(center=settingsButtonRect.center)
+        screen.blit(hover, hover_rect)
+        
+    else:
+        screen.blit(settingsButton, settingsButtonRect)
 
     if shopButtonRect.collidepoint(pygame.mouse.get_pos()):
         hover = pygame.transform.scale(shopButton, (220, 220))
@@ -175,15 +218,12 @@ def draw_game(dt):
     screen.blit(backgroundGame, (0, 0))
     screen.blit(headerText, headerRect)
 
+    screen.blit(backButtonImg, backButtonRect)
+
+    screen.blit(scoreBoard,scoreBoardRect)
+
     boats.update(dt)
     boats.draw(screen)
-
-    backBtnText = backButtonHover if backButtonRect.collidepoint(pygame.mouse.get_pos()) else backButtonNormal
-    pygame.draw.rect(screen, white, backButtonRect)
-    screen.blit(backBtnText, backButtonRect)
-
-    # score plaque
-    screen.blit(scoreBoard,scoreBoardRect)
 
     score_text = buttonfont.render(f"{killed}", True, black)  
     score_rect = score_text.get_rect(center=(scorex, scorey))
@@ -199,9 +239,13 @@ def draw_shop():
     shopText = buttonfont.render("Buy! BUY! BUY! AND! SPEND MONEY!!!!!!!", True, white)
     screen.blit(shopText, (gameWidth / 2 - 200, 300))
 
-    backBtnText = backButtonHover if backButtonRect.collidepoint(pygame.mouse.get_pos()) else backButtonNormal
-    pygame.draw.rect(screen, white, backButtonRect)
-    screen.blit(backBtnText, backButtonRect)
+    screen.blit(backButtonImg, backButtonRect)
+    if quitButtonRect.collidepoint(pygame.mouse.get_pos()):
+        hover = pygame.transform.scale(backButtonImg, (350, 175))
+        hover_rect = hover.get_rect(center=backButtonRect.center)
+        screen.blit(hover, hover_rect)
+    else:
+        screen.blit(backButtonImg,backButtonRect)
 
 
 
@@ -220,6 +264,7 @@ while True:
                     pygame.quit(); sys.exit()
                 elif playButtonRect.collidepoint(pygame.mouse.get_pos()):
                     killed = 0
+                    missed = 0
                     current_page = GAME
                 elif shopButtonRect.collidepoint(pygame.mouse.get_pos()):
                   current_page = SHOP
@@ -233,7 +278,7 @@ while True:
                 if backButtonRect.collidepoint(mouse_pos):
                     #pygame.mixer.stop()
                     boats.empty()
-                    import score
+                    scorePage(killed=killed)
                     current_page = MENU
 
                 for boat in boats:
@@ -241,21 +286,24 @@ while True:
                         boat.kill() 
                         killed += 1
                         #pygame.mixer.stop()
-                        boom1.play()                        
+                        random.choice([boom2, boom3]).play()                        
             
             elif event.type == SPAWN_EVENT:
                 margin = 100
-                y = random.randint(gameHeight // 3, gameHeight - margin)
+                y = random.randint(gameHeight // 3 +40, gameHeight - margin)
                 boat = PirateShip(y)
                 boats.add(boat)
 
 
             elif event.type == SPAWN_EVENT2:                       
                 margin = 100
-                y = random.randint(gameHeight // 3, gameHeight - margin)
+                y = random.randint(gameHeight // 3 +40, gameHeight - margin)
                 boat = PirateShip2(y)
                 boats.add(boat)
 
+            elif event.type == SPAWN_EVENT3:
+                boat = pirateFlyShip(200)       # <-- create an instance
+                boats.add(boat)
 
         elif current_page == SHOP:
             if event.type == pygame.MOUSEBUTTONDOWN:

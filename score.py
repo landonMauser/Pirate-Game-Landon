@@ -1,313 +1,166 @@
 from peewee import *
-import pygame, sys
-from peewee import *
+import pygame, sys, os, random
 from pygame import *
 from pygame.font import Font
-from pygame.sprite import *
-import pygame, sys, os
 from pygame.locals import *
-import random
+from tkinter import messagebox
 
+def scorePage(killed=None, screen=None):
+    """Display top scores and optionally add the player's new score.
+       Pass the player's score as `killed`.
+    """
 
-db = MySQLDatabase(
-    'pirate',
-    host='localhost',
-    port=3306,
-    user='root',
-    password='root'
-)
+    # ---------- Database ----------
+    db = MySQLDatabase(
+        'pirate',
+        host='localhost',
+        port=3306,
+        user='root',
+        password='root'
+    )
 
-class BaseModel(Model):
-    class Meta:
-        database = db
+    class BaseModel(Model):
+        class Meta:
+            database = db
 
-class Scores(BaseModel):
-    #scoreID = AutoField() 
-    ScoreName = CharField
-    ScoreVal = IntegerField()
+    class Scores(BaseModel):
+        ScoreName = CharField()
+        ScoreVal = IntegerField()
 
-# try:
-#     db.connect()
-# except:
-#     print("nah")
+    try:
+        db.connect()
+    except Exception:
+        messagebox.showwarning("Error", "No database connection")
+        return
 
-db.connect()
+    scores = ["", "", ""]
+    scoreVals = [0, 0, 0]
 
+    cursor = db.execute_sql(
+        "SELECT scorename, scoreval FROM scores "
+        "ORDER BY scoreval DESC LIMIT 3"
+    )
+    for i, row in enumerate(cursor.fetchall()):
+        scores[i] = f"{row[0]} {row[1]}"
+        scoreVals[i] = int(row[1])
 
-scores=[None for _ in range(3)]
-scoreVals = [None for _ in range(3)]
-
-cursor = db.execute_sql("select scores.scorename, scores.scoreval from scores order by scores.scoreval desc limit 3")
-
-i = 0
-for row in cursor.fetchall():
-    scores[i] = row[0] + " " + str(row[1])
-    scoreVals[i] = row[1]
-    print(scores[i])
-    i += 1
-
-db.close
-
-
-addingScore = False
-doneAdding = False
-initial1 = ''
-initial2 = ''
-initial3 = ''
-def addScore(name, score):
-    global scores
-    global db
-    global addingScore
-    db.connect() 
-    cursor = db.execute_sql("insert into scores(scorename, scoreval) VALUES ('" + name + "', " + str(score) + ")")
-    cursor = db.execute_sql("select scores.scorename, scores.scoreval from scores order by scores.scoreval desc limit 3")
-    i = 0
-    for row in cursor.fetchall():
-        #print(row[0], row[1])
-        scores[i] = row[0] + " " + str(row[1])
-        print(scores[i])
-        i += 1
     db.close()
 
-# Colors we want to use
-pink = (255,157,195)
-black = (0, 0, 0)
-red = (255,0,0)
-white = (255,255,255)
+    # ---------- Pygame Setup ----------
+    pygame.init()                 # <-- parentheses were missing
+    pygame.font.init()
+    if screen is None:
+        gameWidth, gameHeight = (
+            pygame.display.Info().current_w,
+            pygame.display.Info().current_h,
+        )
+        screen = pygame.display.set_mode((gameWidth, gameHeight))
+    else:
+        gameWidth, gameHeight = screen.get_size()
 
-# set up the display
-pygame.init()
-#screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-screen = pygame.display.set_mode((700,700))
-pygame.display.set_caption("Read from database")
-screen.fill(pink)
+    pink = (255, 157, 195)
+    black, red, white = (0, 0, 0), (255, 0, 0), (255, 255, 255)
 
-# create some fonts
-headerfont = Font('freesansbold.ttf', 24)
-headerfont.set_bold(True)
-header2font = Font('freesansbold.ttf', 18)
-header2font.set_bold(True) 
-infofont = Font('freesansbold.ttf', 16)
-buttonfont = pygame.font.SysFont('Corbel',32)
-buttonfont.set_bold(True)
+    headerfont = Font('freesansbold.ttf', 24)
+    headerfont.set_bold(True)
+    smallfont = Font('freesansbold.ttf', 18)
+    infofont = Font('freesansbold.ttf', 16)
+    buttonfont = pygame.font.SysFont('Corbel', 32, bold=True)
 
-# create some text
-headerText = headerfont.render("Your score is in the top 3! Add to high scores?", True, black, pink)
-headerRect = headerText.get_rect()
-headerRect.center = (350,50)
-pygame.draw.rect(screen,pink,headerRect)
-screen.blit(headerText, headerRect)
+    # ---------- Buttons ----------
+    buttonx, buttony, buttonw, buttonh = 100, 75, 200, 50
+    yesRect = pygame.Rect(buttonx, buttony, buttonw, buttonh)
+    noRect = pygame.Rect(buttonx + 300, buttony, buttonw, buttonh)
 
-subheaderText = header2font.render("Current Top 3", True, black,pink)
-subheaderRect = subheaderText.get_rect() 
-subheaderRect.center = (350,150)
-screen.blit(subheaderText, subheaderRect)
+    # ---------- State ----------
+    addingScore = False
+    doneAdding = False
+    initials = ["_", "_", "_"]
+    initial_index = 0
+    highestscore = scoreVals[0] if scoreVals[0] else 0
+    thirdhighest = scoreVals[2] if scoreVals[2] else 0
 
-highscore1Text = infofont.render(scores[0], True, red, pink)
-highscore1Rect = highscore1Text.get_rect() 
-highscore1Rect.center = (350, 170) 
-pygame.draw.rect(screen,pink,highscore1Rect)
-highscore2Text = infofont.render(scores[1], True, red, pink)
-highscore2Rect = highscore2Text.get_rect() 
-highscore2Rect.center = (350, 190) 
-pygame.draw.rect(screen,pink,highscore2Rect)
-highscore3Text = infofont.render(scores[2], True, red, pink)
-highscore3Rect = highscore3Text.get_rect() 
-highscore3Rect.center = (350, 210) 
-pygame.draw.rect(screen,pink,highscore3Rect)
+    clock = pygame.time.Clock()
 
-initial1Text = infofont.render("_", True, black, white)
-initial1Rect = initial1Text.get_rect()
-initial1Rect.center = (330, 280) 
-pygame.draw.rect(screen,pink,initial1Rect)
-initial2Text = infofont.render("_", True, black, white)
-initial2Rect = initial2Text.get_rect()
-initial2Rect.center = (345, 280) 
-pygame.draw.rect(screen,pink,initial1Rect)
-initial3Text = infofont.render("_", True, black, white)
-initial3Rect = initial3Text.get_rect()
-initial3Rect.center = (360, 280) 
-pygame.draw.rect(screen,pink,initial1Rect)
-instructionText = header2font.render("Enter your 3 initials", True,black,pink)
-instructionRect = instructionText.get_rect()
-instructionRect.center = (350,250)
-pygame.draw.rect(screen,pink,instructionRect)
-init1 = init2 = init3 = '_'
+    # ---------- Helpers ----------
+    def addScore(name, score):
+        try:
+            db.connect()
+            db.execute_sql(
+                "INSERT INTO scores(scorename, scoreval) VALUES (%s, %s)",
+                (name, score),
+            )
+        finally:
+            db.close()
 
-# create text and info for our yes button
-buttonx = 100
-buttony = 75
-buttonw = 200
-buttonh = 50
-yesButtonText = buttonfont.render("YES", True, black, white)
-yesButtonRect = yesButtonText.get_rect()
-yesButtonRect.x = buttonx
-yesButtonRect.y = buttony
-yesButtonRect.w = buttonw
-yesButtonRect.h = buttonh
-# Border rect (outer rectangle)
-yesborderRect = pygame.Rect(buttonx, buttony, buttonw, buttonh)
-# Inner rect (slightly inset so border is visible)
-yesinnerRect = yesborderRect.inflate(-10, -10)  # shrink by 10px in width & height
-# Draw red border
-pygame.draw.rect(screen, (255, 0, 0), yesborderRect, border_radius=30)
-# Draw white fill inside the border
-pygame.draw.rect(screen, (255, 255, 255), yesinnerRect, border_radius=25)
-# Draw text centered in the inner rect
-yestextRect = yesButtonText.get_rect(center=yesinnerRect.center)
-screen.blit(yesButtonText, yestextRect)
+    # ---------- Main Loop ----------
+    running = True
+    while running:
+        dt = clock.tick(60)
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                running = False
 
-noButtonText = buttonfont.render("No thanks", True, black, white)
-noButtonRect = noButtonText.get_rect()
-noButtonRect.x = buttonx+300
-noButtonRect.y = buttony
-noButtonRect.w = buttonw
-noButtonRect.h = buttonh
-# Border rect (outer rectangle)
-noborderRect = pygame.Rect(buttonx+300, buttony, buttonw, buttonh)
-# Inner rect (slightly inset so border is visible)
-noinnerRect = noborderRect.inflate(-10, -10)  # shrink by 10px in width & height
-# Draw red border
-pygame.draw.rect(screen, (255, 0, 0), noborderRect, border_radius=30)
-# Draw white fill inside the border
-pygame.draw.rect(screen, (255, 255, 255), noinnerRect, border_radius=25)
-# Draw text centered in the inner rect
-notextRect = noButtonText.get_rect(center=noinnerRect.center)
-screen.blit(noButtonText, notextRect)
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if yesRect.collidepoint(event.pos) and not doneAdding:
+                    addingScore = True
+                elif noRect.collidepoint(event.pos):
+                    running = False
 
-while True:
-    for event in pygame.event.get():
-        if event.type == QUIT:
-            pygame.quit()
-            sys.exit()
-        # find mouse position
-        mousePos = pygame.mouse.get_pos()
-        mousex = mousePos[0]
-        mousey = mousePos[1]
+            elif addingScore and event.type == pygame.KEYUP and event.unicode.isalpha():
+                if initial_index < 3:
+                    initials[initial_index] = event.unicode.upper()
+                    initial_index += 1
+                if initial_index == 3:
+                    # Use the passed-in killed score (fallback to at least 1 above third place)
+                    newScore = killed if killed is not None else random.randint(thirdhighest + 1,
+                                                                                highestscore + 4)
+                    addScore("".join(initials), newScore)
+                    doneAdding = True
 
-        if addingScore and event.type == pygame.KEYUP and event.unicode.isalpha():
-            if initial1 == '':
-                initial1 = {event.unicode}
-                init1 = initial1.pop().upper()
-            elif initial2 == '':
-                initial2 = {event.unicode}
-                init2 = initial2.pop().upper()
-            else:
-                initial3 = {event.unicode}
-                addingScore = False 
-                scoreToAdd = random.randint(thirdhighest+1,highestscore+4)
-                init3 = initial3.pop().upper()
-                addScore(init1 + init2 + init3, scoreToAdd)
-                initial1 = initial2 = initial3 = ''
-                highestscore = int(scoreVals[0])
-                thirdhighest = int(scoreVals[2])
-                highscore1Text = infofont.render(scores[0], True, red, pink)
-                highscore1Rect = highscore1Text.get_rect() 
-                highscore1Rect.center = (350, 170) 
-                pygame.draw.rect(screen,pink,highscore1Rect)
-                highscore2Text = infofont.render(scores[1], True, red, pink)
-                highscore2Rect = highscore2Text.get_rect() 
-                highscore2Rect.center = (350, 190) 
-                pygame.draw.rect(screen,pink,highscore2Rect)
-                highscore3Text = infofont.render(scores[2], True, red, pink)
-                highscore3Rect = highscore3Text.get_rect() 
-                highscore3Rect.center = (350, 210) 
-                pygame.draw.rect(screen,pink,highscore3Rect)
-                doneAdding = True
-            
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            if mousex >= buttonx and mousex <= buttonx + buttonw and \
-               mousey >= buttony and mousey <= buttony + buttonh:
-                # Create the layout
-                addingScore = True
-                highestscore = int(scoreVals[0])
-                thirdhighest = int(scoreVals[2])
-                highscore1Text = infofont.render(scores[0], True, red, pink)
-                highscore1Rect = highscore1Text.get_rect() 
-                highscore1Rect.center = (350, 170) 
-                pygame.draw.rect(screen,pink,highscore1Rect)
-                highscore2Text = infofont.render(scores[1], True, red, pink)
-                highscore2Rect = highscore2Text.get_rect() 
-                highscore2Rect.center = (350, 190) 
-                pygame.draw.rect(screen,pink,highscore2Rect)
-                highscore3Text = infofont.render(scores[2], True, red, pink)
-                highscore3Rect = highscore3Text.get_rect() 
-                highscore3Rect.center = (350, 210) 
-                pygame.draw.rect(screen,pink,highscore3Rect)
+        # ---------- Drawing ----------
+        screen.fill(pink)
 
-    # paint the background
-    screen.fill(pink)
+        # Header
+        headerText = headerfont.render(
+            "Your score is in the top 3! Add to high scores?",
+            True,
+            black,
+            pink,
+        )
+        screen.blit(headerText, headerText.get_rect(center=(350, 50)))
 
-    # draw the header
-    if not doneAdding:
-        pygame.draw.rect(screen, pink, headerRect)
-        screen.blit(headerText, headerRect)
+        subheader = smallfont.render("Current Top 3", True, black, pink)
+        screen.blit(subheader, subheader.get_rect(center=(350, 150)))
 
-    # draw the scores
-    pygame.draw.rect(screen,pink,subheaderRect) 
-    screen.blit(subheaderText, subheaderRect )
-    pygame.draw.rect(screen, pink, highscore1Rect)
-    screen.blit(highscore1Text, highscore1Rect)
-    pygame.draw.rect(screen, pink, highscore2Rect)
-    screen.blit(highscore2Text, highscore2Rect)
-    pygame.draw.rect(screen, pink, highscore3Rect)
-    screen.blit(highscore3Text, highscore3Rect)
+        for i, s in enumerate(scores):
+            txt = infofont.render(s, True, red, pink)
+            screen.blit(txt, txt.get_rect(center=(350, 170 + i * 20)))
 
-    # draw the input boxes
-    if addingScore:
-        #pygame.draw.rect(screen,pink,initial1Rect)
-        #screen.blit(initial1Text,initial1Rect)
+        if addingScore:
+            instr = smallfont.render("Enter your 3 initials", True, black, pink)
+            screen.blit(instr, instr.get_rect(center=(350, 250)))
+            for i, ch in enumerate(initials):
+                t = infofont.render(ch, True, black, white)
+                screen.blit(t, t.get_rect(center=(330 + i * 15, 280)))
+                draw_button(noRect, "Back", red if noRect.collidepoint(m) else black)
 
-        initial1Text = infofont.render(init1, True, black, white)
-        initial1Rect = initial1Text.get_rect()
-        initial1Rect.center = (330, 280) 
-        pygame.draw.rect(screen,pink,initial1Rect)
-        screen.blit(initial1Text,initial1Rect)
 
-        initial2Text = infofont.render(init2, True, black, white)
-        initial2Rect = initial2Text.get_rect()
-        initial2Rect.center = (345, 280) 
-        pygame.draw.rect(screen,pink,initial2Rect)
-        screen.blit(initial2Text,initial2Rect)
+        if not doneAdding:
+            # draw buttons
+            def draw_button(rect, text, hover):
+                border = 30
+                inner = rect.inflate(-10, -10)
+                pygame.draw.rect(screen, red, rect, border_radius=border)
+                pygame.draw.rect(screen, white, inner, border_radius=border - 5)
+                t = buttonfont.render(text, True, hover, white)
+                screen.blit(t, t.get_rect(center=inner.center))
 
-        initial3Text = infofont.render(init3, True, black, white)
-        initial3Rect = initial3Text.get_rect()
-        initial3Rect.center = (360, 280) 
-        pygame.draw.rect(screen,pink,initial3Rect)
-        screen.blit(initial3Text,initial3Rect)
+            m = pygame.mouse.get_pos()
+            draw_button(yesRect, "Yes", red if yesRect.collidepoint(m) else black)
+            draw_button(noRect, "No thanks", red if noRect.collidepoint(m) else black)
 
-        pygame.draw.rect(screen,pink,instructionRect)
-        screen.blit(instructionText,instructionRect)
 
-    # ✅ draw the button every frame
-    if not doneAdding:
-        yesborderRect = pygame.Rect(buttonx, buttony, buttonw, buttonh)
-        yesinnerRect = yesborderRect.inflate(-10, -10)
-        noborderRect = pygame.Rect(buttonx+300, buttony, buttonw, buttonh)
-        noinnerRect = noborderRect.inflate(-10, -10)
+        pygame.display.flip()
 
-        # if hovering on a button, change its color
-        if mousex >= buttonx and mousex <= buttonx + buttonw and \
-                mousey >= buttony and mousey <= buttony + buttonh:
-            yesButtonText = buttonfont.render("Yes!", True, red, white)
-        else:
-            yesButtonText = buttonfont.render("Yes ", True, black, white)
-        if mousex >= buttonx+300 and mousex <= buttonx+300 + buttonw and \
-                mousey >= buttony and mousey <= buttony + buttonh:
-            noButtonText = buttonfont.render("No thanks!", True, red, white)
-        else:
-            noButtonText = buttonfont.render("No thanks", True, black, white)
-
-        pygame.draw.rect(screen, (255, 0, 0), yesborderRect, border_radius=30)       # red border
-        pygame.draw.rect(screen, (255, 255, 255), yesinnerRect, border_radius=25) 
-        pygame.draw.rect(screen, (255, 0, 0), noborderRect, border_radius=30)       # red border
-        pygame.draw.rect(screen, (255, 255, 255), noinnerRect, border_radius=25)     # white fill
-
-        yestextRect = yesButtonText.get_rect(center=yesinnerRect.center)
-        screen.blit(yesButtonText, yestextRect)
-
-        notextRect = noButtonText.get_rect(center=noinnerRect.center)
-        screen.blit(noButtonText, notextRect)
-
-    # update the display
-    pygame.display.update()
+    return

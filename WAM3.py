@@ -1,194 +1,154 @@
-from pygame import *
-from pygame.font import Font
-from pygame.sprite import *
+from peewee import *
 import pygame, sys, os, random
+from pygame.font import Font
 from pygame.locals import *
+from tkinter import messagebox
 
-# Resource path helper (for EXE builds later)
-def resource_path(myPath):
+def scorePage(player_score=None, player_name=None, screen=None):
+    """
+    Show the high-score screen.
+    - player_score: int or None. If given, it’s used to decide if we prompt for adding a new high score.
+    - player_name: str or None. If given together with player_score, it will insert the score immediately.
+    - screen: optional Pygame surface. If None, a full-screen window is created.
+    """
+
+    # ---------- Database ----------
+    db = MySQLDatabase(
+        'pirate',
+        host='localhost',
+        port=3306,
+        user='root',
+        password='root'
+    )
+
+    class BaseModel(Model):
+        class Meta:
+            database = db
+
+    class Scores(BaseModel):
+        ScoreName = CharField()
+        ScoreVal = IntegerField()
+
     try:
-        basePath = sys._MEIPASS
+        db.connect()
     except Exception:
-        basePath = r"C:\Genral school work\userInterface\pirateGame\resources"
-    return os.path.join(basePath, myPath)
+        messagebox.showwarning("Error", "No database connection")
+        return
 
-# Init
-pygame.init()
-#gameWidth, gameHeight = [pygame.display.Info().current_w, pygame.display.Info().current_h]
-gameWidth, gameHeight = 1536,1024
-screen = pygame.display.set_mode((gameWidth, gameHeight))
-pygame.display.set_caption("There be treasure!!!")
-clock = pygame.time.Clock()
+    # Fetch current top 3
+    scores = ["", "", ""]
+    scoreVals = [0, 0, 0]
+    cursor = db.execute_sql(
+        "SELECT scorename, scoreval FROM scores ORDER BY scoreval DESC LIMIT 3"
+    )
+    for i, row in enumerate(cursor.fetchall()):
+        scores[i] = f"{row[0]} {row[1]}"
+        scoreVals[i] = int(row[1])
+    db.close()
 
-# Backgrounds
-backgroundGame = pygame.image.load(resource_path("background10.png")).convert()
-backgroundGame = pygame.transform.scale(backgroundGame, (gameWidth, gameHeight))
-
-backgroundMenu = pygame.image.load(resource_path("boatCamp2.png")).convert()
-backgroundMenu = pygame.transform.scale(backgroundMenu, (gameWidth, gameHeight))
-
-backgroundShop = pygame.image.load(resource_path("boatCamp1.png")).convert()
-backgroundShop = pygame.transform.scale(backgroundShop, (gameWidth, gameHeight))
-
-# Sprite
-shipSprite = pygame.image.load(resource_path("piratePixelShip1.png")).convert_alpha()
-shipSprite = pygame.transform.scale(shipSprite, (90, 90))
-
-shipSprite3 = pygame.image.load(resource_path("piratePixelShip3.png")).convert_alpha()
-shipSprite3 = pygame.transform.scale(shipSprite3, (90, 90))
-
-# Colors
-pink = (255, 157, 195)
-white = (255, 255, 255)
-black = (0, 0, 0)
-red = (255, 0, 0)
-
-
-headerfont = Font('freesansbold.ttf', 48)
-buttonfont = pygame.font.SysFont('Arial', 32, bold=True)
-
-headerText = headerfont.render("Whack 'A pirateShip!", True, black, pink)
-headerRect = headerText.get_rect(center=(gameWidth / 2, 100))
-
-startButton = pygame.image.load(resource_path("startButton1.png")).convert_alpha()
-startButton = pygame.transform.scale(startButton, (400, 200)) 
-playButtonRect = startButton.get_rect(topleft=(gameWidth / 2 - 200, 300))
-
-quitButtonNormal = buttonfont.render(" Quit ", True, black, pink)
-quitButtonHover = buttonfont.render(" Quit ", True, red, pink)
-quitButtonRect = quitButtonNormal.get_rect(topleft=(gameWidth / 2 - 60, 750))
-
-
-shopButtonNormal = buttonfont.render(" Shop ", True, black, pink)
-shopButtonHover = buttonfont.render(" Shop ", True, red, pink)
-shopButtonRect = shopButtonNormal.get_rect(topleft=(gameWidth / 2 - 60, 480))
-
-backButtonNormal = buttonfont.render(" Back ", True, black, pink)
-backButtonHover = buttonfont.render(" Back ", True, red, pink)
-backButtonRect = backButtonNormal.get_rect(topleft=(gameWidth / 2 - 60, 750))
-
-
-# Pages
-MENU = "menu"
-GAME = "game"
-SHOP = "shop"
-
-current_page = MENU
-
-class PirateShip(pygame.sprite.Sprite):
-    def __init__(self, y):
-        super().__init__()
-        self.image = random.choice([shipSprite, shipSprite3])
-        self.rect = self.image.get_rect(topleft=(0, y))
-        self.speed = random.randint(100, 200)
-        self.x = float(self.rect.x)  
-
-    def update(self, dt):
-        self.x += self.speed * dt
-        self.rect.x = int(self.x)
-        if self.rect.left > gameWidth:
-            self.kill()
-
-
-
-boats = pygame.sprite.Group()
-
-SPAWN_EVENT = pygame.USEREVENT + 1
-pygame.time.set_timer(SPAWN_EVENT, 1800)  
-
-def draw_menu():
-    screen.blit(backgroundMenu, (0, 0))
-    title = headerfont.render("Main Menu", True, white)
-    titleRect = title.get_rect(center=(gameWidth / 2, 200))
-    screen.blit(title, titleRect)
-
-
-    mouse_pos = pygame.mouse.get_pos()
-    if playButtonRect.collidepoint(mouse_pos):
-        # Grow 10% larger on hover
-        hover_img = pygame.transform.scale(startButton, (int(420),int(210)))
-
-        # Re-center so it grows outward evenly
-        hover_rect = hover_img.get_rect(center=playButtonRect.center)
-        screen.blit(hover_img, hover_rect)
+    # ---------- Pygame Setup ----------
+    pygame.init()  # <-- add this line
+    pygame.font.init()
+    if screen is None:
+        gameWidth, gameHeight = (
+            pygame.display.Info().current_w,
+            pygame.display.Info().current_h,
+        )
+        screen = pygame.display.set_mode((gameWidth, gameHeight))
     else:
-        # Normal size
-        screen.blit(startButton, playButtonRect)
+        gameWidth, gameHeight = screen.get_size()
 
+    pink = (255, 157, 195)
+    black, red, white = (0, 0, 0), (255, 0, 0), (255, 255, 255)
 
-    shopBtnText = shopButtonHover if shopButtonRect.collidepoint(pygame.mouse.get_pos()) else shopButtonNormal
-    pygame.draw.rect(screen, white, shopButtonRect)
-    screen.blit(shopBtnText, shopButtonRect)
-    
-    quitBtnText = quitButtonHover if quitButtonRect.collidepoint(pygame.mouse.get_pos()) else quitButtonNormal
-    pygame.draw.rect(screen, white, quitButtonRect)
-    screen.blit(quitBtnText, quitButtonRect)
+    headerfont = Font('freesansbold.ttf', 24)
+    headerfont.set_bold(True)
+    smallfont = Font('freesansbold.ttf', 18)
+    infofont = Font('freesansbold.ttf', 16)
+    buttonfont = pygame.font.SysFont('Corbel', 32, bold=True)
 
+    # ---------- Buttons ----------
+    buttonx, buttony, buttonw, buttonh = 100, 75, 200, 50
+    yesRect = pygame.Rect(buttonx, buttony, buttonw, buttonh)
+    noRect = pygame.Rect(buttonx + 300, buttony, buttonw, buttonh)
 
-def draw_game(dt):
-    screen.blit(backgroundGame, (0, 0))
-    screen.blit(headerText, headerRect)
+    # ---------- State ----------
+    highestscore = scoreVals[0] if scoreVals[0] else 0
+    thirdhighest = scoreVals[2] if scoreVals[2] else 0
 
-    boats.update(dt)
-    boats.draw(screen)
+    addingScore = False
+    doneAdding = False
+    initials = ["_", "_", "_"]
+    initial_index = 0
+    clock = pygame.time.Clock()
 
-    quitBtnText = quitButtonHover if quitButtonRect.collidepoint(pygame.mouse.get_pos()) else quitButtonNormal
-    pygame.draw.rect(screen, white, quitButtonRect)
-    screen.blit(quitBtnText, quitButtonRect)
+    # Decide if we should prompt to add score automatically
+    if player_score is not None and player_score > thirdhighest:
+        addingScore = True
 
+    # If both score and name given: insert and skip interactive adding
+    if player_score is not None and player_name:
+        try:
+            db.connect()
+            db.execute_sql(
+                "INSERT INTO scores(scorename, scoreval) VALUES (%s, %s)",
+                (player_name, player_score),
+            )
+        finally:
+            db.close()
+        doneAdding = True  # we still show the screen but skip input
 
-def draw_shop():
-    screen.blit(backgroundMenu, (0, 0))
-    title = headerfont.render("Shop", True, white)
-    titleRect = title.get_rect(center=(gameWidth / 2, 150))
-    screen.blit(title, titleRect)
+    # ---------- Helpers ----------
+    def addScore(name, score):
+        try:
+            db.connect()
+            db.execute_sql(
+                "INSERT INTO scores(scorename, scoreval) VALUES (%s, %s)",
+                (name, score),
+            )
+        finally:
+            db.close()
 
-    shopText = buttonfont.render("Buy! BUY! BUY! AND! SPEND MONEY!!!!!!!", True, white)
-    screen.blit(shopText, (gameWidth / 2 - 200, 300))
+    # ---------- Main Loop ----------
+    running = True
+    while running:
+        dt = clock.tick(60)
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                running = False
 
-    backBtnText = backButtonHover if backButtonRect.collidepoint(pygame.mouse.get_pos()) else backButtonNormal
-    pygame.draw.rect(screen, white, backButtonRect)
-    screen.blit(backBtnText, backButtonRect)
+            elif event.type == pygame.MOUSEBUTTONDOWN and not doneAdding:
+                if yesRect.collidepoint(event.pos):
+                    addingScore = True
+                elif noRect.collidepoint(event.pos):
+                    running = False
 
+            elif addingScore and not doneAdding and event.type == pygame.KEYUP:
+                if event.unicode.isalpha() and initial_index < 3:
+                    initials[initial_index] = event.unicode.upper()
+                    initial_index += 1
+                if initial_index == 3 and player_score is not None:
+                    addScore("".join(initials), player_score)
+                    doneAdding = True
 
-# --- Main Loop ---
-while True:
-    dt = clock.tick(60) / 1000  # Delta time in seconds
+        # ---------- Drawing ----------
+        screen.fill(pink)
 
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
+        headerText = headerfont.render(
+            "High Scores", True, black, pink
+        )
+        screen.blit(headerText, headerText.get_rect(center=(350, 40)))
 
-        if current_page == MENU:
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if playButtonRect.collidepoint(pygame.mouse.get_pos()):
-                    current_page = GAME
-                elif shopButtonRect.collidepoint(pygame.mouse.get_pos()):
-                  current_page = SHOP
+        subheader = smallfont.render("Current Top 3", True, black, pink)
+        screen.blit(subheader, subheader.get_rect(center=(350, 100)))
 
+        for i, s in enumerate(scores):
+            txt = infofont.render(s, True, red, pink)
+            screen.blit(txt, txt.get_rect(center=(350, 130 + i * 20)))
 
-
-        elif current_page == GAME:
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if quitButtonRect.collidepoint(pygame.mouse.get_pos()):
-                    pygame.quit(); sys.exit()
-            elif event.type == SPAWN_EVENT:
-                y = random.randint(50, gameHeight - 100)
-                boat = PirateShip(y)
-                boats.add(boat)
-
-        elif current_page == SHOP:
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if backButtonRect.collidepoint(pygame.mouse.get_pos()):
-                    current_page = MENU
-
-    if current_page == MENU:
-        draw_menu()
-    elif current_page == GAME:
-        draw_game(dt)
-    elif current_page == SHOP:
-        draw_shop()
-
-    pygame.display.update()
-
+        # Show prompt only if we have a score to add and we haven’t finished
+        if player_score is not None and not doneAdding:
+            prompt = "Your score is in the top 3! Add it?"
+            promptText = smallfont.render(prompt, True, black, pink)
+        
+scorePage()
