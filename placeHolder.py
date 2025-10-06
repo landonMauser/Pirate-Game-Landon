@@ -81,14 +81,13 @@ def scorePage(killed=None, screen=None):
     except Exception:
         messagebox.showwarning("Error", "No database connection")
         return
-    
-    scores = [""] * 5
-    scoreVals = [0] * 5
 
+    scores = ["", "", ""]
+    scoreVals = [0, 0, 0]
 
     cursor = db.execute_sql(
         "SELECT scorename, scoreval FROM scores "
-        "ORDER BY scoreval DESC LIMIT 5"
+        "ORDER BY scoreval DESC LIMIT 3"
     )
     for i, row in enumerate(cursor.fetchall()):
         scores[i] = f"{row[0]} {row[1]}"
@@ -109,46 +108,23 @@ def scorePage(killed=None, screen=None):
     scoreScroll2 = pygame.image.load("scoreScroll2.png").convert()
     scoreScroll2 = pygame.transform.scale(scoreScroll2, (gameWidth, gameHeight))
 
-    # ---------- Colors and Fonts ----------
-    parchment_brown = (67, 45, 18)
-    dark_brown = (35, 22, 10)
-    gold = (205, 160, 58)
-    white = (255, 255, 255)
-    shadow = (0, 0, 0)
-    black = (0, 0, 0)
+    black, white = (0, 0, 0), (255, 255, 255)
+    headerfont = Font('freesansbold.ttf', 24)
+    headerfont.set_bold(True)
+    smallfont = Font('freesansbold.ttf', 18)
+    infofont = Font('freesansbold.ttf', 16)
+    buttonfont = pygame.font.SysFont('Corbel', 32, bold=True)
 
-    headerfont = Font('freesansbold.ttf', 48)
-    smallfont = Font('freesansbold.ttf', 32)
-    infofont = Font('freesansbold.ttf', 26)
-    buttonfont = pygame.font.SysFont('Corbel', 36, bold=True)
-
-    buttonx, buttony, buttonw, buttonh = gameWidth / 2, 850, 200, 50
-    yesRect = pygame.Rect(gameWidth/2-320, buttony, buttonw, buttonh)
-    noRect = pygame.Rect(gameWidth/2, buttony, buttonw, buttonh)
+    buttonx, buttony, buttonw, buttonh = gameWidth / 2 + 200, 400, 200, 50
+    yesRect = pygame.Rect(buttonx, buttony, buttonw, buttonh)
+    noRect = pygame.Rect(buttonx + 300, buttony, buttonw, buttonh)
 
     addingScore = False
     doneAdding = False
     highestscore = scoreVals[0] if scoreVals[0] else 0
-    fifthhighest = scoreVals[4] if scoreVals[4] else 0
-    newScore = killed if killed is not None else random.randint(fifthhighest + 1, highestscore + 4)
+    thirdhighest = scoreVals[2] if scoreVals[2] else 0
 
     clock = pygame.time.Clock()
-    
-    def draw_shadowed_text(text, font, color, shadow_color, pos, center=True):
-        txt_surface = font.render(text, True, color)
-        shadow_surface = font.render(text, True, shadow_color)
-        rect = txt_surface.get_rect(center=pos) if center else txt_surface.get_rect(topleft=pos)
-        shadow_rect = rect.copy()
-        shadow_rect.move_ip(3, 3)
-        screen.blit(shadow_surface, shadow_rect)
-        screen.blit(txt_surface, rect)
-
-    def draw_button(rect, text, hover):
-        border_radius = 25
-        base_color = gold if hover else parchment_brown
-        pygame.draw.rect(screen, dark_brown, rect.inflate(6, 6), border_radius=border_radius)
-        pygame.draw.rect(screen, base_color, rect, border_radius=border_radius)
-        draw_shadowed_text(text, buttonfont, white, shadow, rect.center)
 
     def addScore(name, score):
         try:
@@ -172,46 +148,42 @@ def scorePage(killed=None, screen=None):
                     addingScore = True
                     playerName = get_player_name()
                     if playerName:
+                        newScore = killed if killed is not None else random.randint(
+                            thirdhighest + 1, highestscore + 4
+                        )
                         addScore(playerName, newScore)
                         doneAdding = True
                 elif noRect.collidepoint(event.pos):
                     running = False
-        # ---------- Draw Screen ----------
+
+        # ---------- Draw screen ----------
         screen.blit(scoreScroll2, (0, 0))
-        offset = 190
 
-        # Title (Black, No Shadow)
-        title_surface = headerfont.render("Top Pirate Scores", True, black)
-        title_rect = title_surface.get_rect(center=(gameWidth / 2 - 50, 150 + offset))
-        screen.blit(title_surface, title_rect)
+        headerText = headerfont.render(
+            "Would you like to add your score?", True, black
+        )
+        screen.blit(headerText, headerText.get_rect(center=(gameWidth / 2, 400)))
 
-        subtitle_surface = smallfont.render("Will ye add yer name to history?", True, parchment_brown)
-        subtitle_rect = subtitle_surface.get_rect(center=(gameWidth / 2 - 50, 240 + offset))
-        screen.blit(subtitle_surface, subtitle_rect)
+        subheader = smallfont.render("Current Top 3", True, black)
+        screen.blit(subheader, subheader.get_rect(center=(gameWidth / 2, 450)))
 
-        # Top Scores
         for i, s in enumerate(scores):
-            y = 350 + i * 60 + offset
-            txt_surface = infofont.render(f"{i + 1}. {s}", True, dark_brown)
-            rect = txt_surface.get_rect(center=(gameWidth / 2 - 50, y))
-            screen.blit(txt_surface, rect)
+            txt = infofont.render(s, True, black)
+            screen.blit(txt, txt.get_rect(center=(gameWidth / 2, 500 + i * 30)))
 
-        # ---------- Simple Current Score Text (Black, No Shadow) ----------
-        score_text_surface = headerfont.render(f"Your Score: {newScore}", True, black)
-        score_text_rect = score_text_surface.get_rect(topright=(gameWidth/2+50, 100))
-        screen.blit(score_text_surface, score_text_rect)
+        def draw_button(rect, text, hover):
+            border = 30
+            inner = rect.inflate(-10, -10)
+            pygame.draw.rect(screen, black, rect, border_radius=border)
+            pygame.draw.rect(screen, white, inner, border_radius=border - 5)
+            t = buttonfont.render(text, True, hover)
+            screen.blit(t, t.get_rect(center=inner.center))
 
-
-
-        # ---------- Buttons ----------
         m = pygame.mouse.get_pos()
         if not doneAdding:
-            draw_button(yesRect, "Aye!", yesRect.collidepoint(m))
-            draw_button(noRect, "Nay...", noRect.collidepoint(m))
+            draw_button(yesRect, "Yes", black if yesRect.collidepoint(m) else black)
+            draw_button(noRect, "No thanks", black if noRect.collidepoint(m) else black)
         else:
-            draw_button(noRect, "Back to Sea", noRect.collidepoint(m))
+            draw_button(noRect, "Back", black if noRect.collidepoint(m) else black)
 
         pygame.display.flip()
-
-    # ---------- Return instead of exit ----------
-    return
