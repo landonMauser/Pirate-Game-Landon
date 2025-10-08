@@ -4,6 +4,8 @@ from pygame import *
 from pygame.font import Font
 from pygame.locals import *
 from tkinter import messagebox, Tk, Label, Entry, Button
+import pymysql
+pymysql.install_as_MySQLdb()
 
 
 def get_player_name():
@@ -174,6 +176,7 @@ def scorePage(killed=None, screen=None):
                     if playerName:
                         addScore(playerName, newScore)
                         doneAdding = True
+                        scores = [f"{row[0]} {row[1]}" for row in db.execute_sql("SELECT scorename, scoreval FROM scores ORDER BY scoreval DESC LIMIT 5").fetchall()]
                 elif noRect.collidepoint(event.pos):
                     running = False
         # ---------- Draw Screen ----------

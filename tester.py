@@ -14,7 +14,6 @@ popup = None
 import os, sys
 
 def resource_path(relative_path):
-    """Get absolute path to resource, works for dev and for PyInstaller EXE."""
     if getattr(sys, '_MEIPASS', False):
         base_path = sys._MEIPASS
     else:
@@ -27,7 +26,6 @@ screen = pygame.display.set_mode((gameWidth, gameHeight))
 pygame.display.set_caption("There be treasure!!!")
 clock = pygame.time.Clock()
 
-# Backgrounds
 backgroundGame = pygame.image.load(resource_path("resources/background10.png")).convert()
 backgroundGame = pygame.transform.scale(backgroundGame, (gameWidth, gameHeight))
 
@@ -94,10 +92,6 @@ startButton = pygame.image.load(resource_path("resources/buttons/arcade.png")).c
 startButton = pygame.transform.scale(startButton, (300, 150)) 
 playButtonRect = startButton.get_rect(topleft=(gameWidth / 2 - 120, 500))
 
-quitButton = pygame.image.load(resource_path("resources/buttons/quitButton2.png")).convert_alpha()
-quitButton = pygame.transform.scale(quitButton, (300, 150))
-quitButtonRect = quitButton.get_rect(topleft=(gameWidth / 2 - 110, 900))
-
 shopButton = pygame.image.load(resource_path("resources/buttons/shop.png")).convert_alpha()
 shopButton = pygame.transform.scale(shopButton, (300, 150))
 shopButtonRect = shopButton.get_rect(topleft=(gameWidth / 2 - 120, 700))
@@ -124,11 +118,9 @@ buttonfont = pygame.font.SysFont('Arial', 40, bold=True)
 headerText = headerfont.render("Whack 'A pirateShip!", True, black, None)
 headerRect = headerText.get_rect(center=(gameWidth / 2, 100))
 
-# Back button image
 backButtonImg = pygame.image.load(resource_path("resources/buttons/backButton1.png")).convert_alpha()
 backButtonImg = pygame.transform.scale(backButtonImg, (200, 150)) 
 backButtonRect = backButtonImg.get_rect(topleft=(gameWidth / 2 - 100, 750))
-
 
 scoreText = buttonfont.render("Score:     ", True, black)
 scoreRect = scoreText.get_rect()
@@ -137,7 +129,6 @@ scorey = gameHeight / 6.4
 scoreRect.center = (scorex,scorey)
 pygame.draw.rect(screen,True,scoreRect)
 
-# Pages
 MENU = "menu"
 GAME = "game"
 SHOP = "shop"
@@ -226,6 +217,7 @@ def hide_popup():
     if popup is not None:
         popup.destroy()
         popup = None
+
 def draw_menu():
     global popup, current_page, audioOn
     screen.blit(backgroundMenu, (0, 0))
@@ -252,18 +244,6 @@ def draw_menu():
             return  # Exit menu after click
     else:
         screen.blit(startButton, playButtonRect)
-
-    if quitButtonRect.collidepoint(mouse_pos):
-        hover = pygame.transform.scale(quitButton, (350, 175))
-        hover_rect = hover.get_rect(center=quitButtonRect.center)
-        screen.blit(hover, hover_rect)
-        popup_text = "Quit the game"
-        if clicked:
-            hide_popup()
-            pygame.quit()
-            sys.exit()
-    else:
-        screen.blit(quitButton, quitButtonRect)
 
     if storyButtonRect.collidepoint(mouse_pos):
         hover = pygame.transform.scale(storyButton, (350, 175))
@@ -311,10 +291,7 @@ def draw_menu():
 current_level = None
 
 def draw_level_select():
-    """
-    Draws the Level Select page with 8 levels in a 4x2 grid.
-    Returns the rects for click detection.
-    """
+
     screen.blit(backgroundMenu, (0, 0))
     
     title = headerfont.render("Level Select", True, white)
@@ -339,7 +316,7 @@ def draw_level_select():
 
     total_width = columns * button_width + (columns - 1) * spacing_x
     start_x = (gameWidth - total_width) / 2
-    start_y = 400  # top row Y position
+    start_y = 400  
     levelRects = []
     for row in range(rows):
         for col in range(columns):
@@ -357,13 +334,12 @@ def draw_level_select():
 
             pygame.draw.rect(screen, color, rect, border_radius=12)
 
-            # Level text
             text = buttonfont.render(f"Level {level_num}", True, (0, 0, 0))
             text_rect = text.get_rect(center=rect.center)
             screen.blit(text, text_rect)
 
     level8_note = buttonfont.render("Level 8 gives no gold", True, white)
-    level8_rect = levelRects[-1]  # Level 8 is the last one
+    level8_rect = levelRects[-1]  
     note_x = level8_rect.right + 20  
     note_y = level8_rect.centery
     note_rect = level8_note.get_rect(midleft=(note_x, note_y))
@@ -408,7 +384,6 @@ def handle_level_select_click(event):
 def draw_game():
     screen.blit(backgroundGame, (0, 0))
     screen.blit(headerText, headerRect)
-    screen.blit(backButtonImg, backButtonRect)
     screen.blit(scoreBoard, scoreBoardRect)
 
     boats.draw(screen)
@@ -477,7 +452,6 @@ def draw_shop():
             normalImg = pygame.transform.scale(image, (button_width, button_height))
             screen.blit(normalImg, rect)
 
-        # Owned + cost text
         owned_text = smallFont.render(f"Owned: {powerUpOwned[name]}", True, white)
         cost_text = smallFont.render(f"Cost: {powerUpCost[name]}", True, white)
 
@@ -487,7 +461,6 @@ def draw_shop():
         screen.blit(owned_text, owned_rect)
         screen.blit(cost_text, cost_rect)
 
-    # === Tooltip Handling ===
     mx, my = mouse_pos
     if popup_text:
         if popup is None:
@@ -510,7 +483,6 @@ def draw_boss_level():
     screen.blit(bossBackground, (0, 0)) 
     screen.blit(headerText, headerRect)  
 
-    screen.blit(backButtonImg, backButtonRect)
     screen.blit(scoreBoard, scoreBoardRect)
 
     boats.draw(screen)
@@ -528,16 +500,18 @@ def draw_boss_level():
     timer_rect = timer_text.get_rect(center=(scorex, scorey + 80))
     screen.blit(timer_text, timer_rect)
 
-powerUp4_x = 150  
-powerUp4_y = 50  
-powerUp4_size = 50  
+powerUp4_x = 125  
+powerUp4_y = 230  
+powerUp4_size = 80  
 def draw_powerUp4_counter():
     icon = pygame.transform.scale(powerUp4, (powerUp4_size, powerUp4_size))
     screen.blit(icon, (powerUp4_x, powerUp4_y))
 
-    count_text = buttonfont.render(f"x{powerUpOwned['powerUp4']}", True, black)
+    count_text = smallFont.render(f"({powerUpOwned['powerUp4']}) Screen wipes Owned, Press spacebar to activate", True, black)
     count_rect = count_text.get_rect(midleft=(powerUp4_x + powerUp4_size + 10, powerUp4_y + powerUp4_size / 2))
     screen.blit(count_text, count_rect)
+
+score_popup = None
 
 def show_score_popup(killed, missed):
     popup = tk.Toplevel()
@@ -556,20 +530,19 @@ def show_score_popup(killed, missed):
     y = (gameHeight // 2) - 75
     popup.geometry(f"300x150+{x}+{y}")
 
-    popup.after(4500, popup.destroy)
+    popup.after(4000, popup.destroy)
 
 LEVEL_SETTINGS = {
-    1: {"spawn_rate": (3000, 4500, 6500), "speed_mult": 0.75, "fly_chance": 0.005},
-    2: {"spawn_rate": (2800, 4300, 6000), "speed_mult": 0.85, "fly_chance": 0.015},
-    3: {"spawn_rate": (2600, 4100, 5600), "speed_mult": 0.95, "fly_chance": 0.03},
-    4: {"spawn_rate": (2400, 3900, 5200), "speed_mult": 1.05, "fly_chance": 0.05},
-    5: {"spawn_rate": (2200, 3700, 4800), "speed_mult": 1.15, "fly_chance": 0.07},
-    6: {"spawn_rate": (2000, 3500, 4600), "speed_mult": 1.25, "fly_chance": 0.09},
-    7: {"spawn_rate": (1800, 3300, 4400), "speed_mult": 1.35, "fly_chance": 0.11}
+    1: {"spawn_rate": (3000, 4500, 6500), "speed_mult": 0.8,  "fly_chance": 0.01},
+    2: {"spawn_rate": (2600, 4100, 6000), "speed_mult": 1.0,  "fly_chance": 0.03}, 
+    3: {"spawn_rate": (2200, 3600, 5200), "speed_mult": 1.2,  "fly_chance": 0.05}, 
+    4: {"spawn_rate": (1900, 3200, 4600), "speed_mult": 1.4,  "fly_chance": 0.07},  
+    5: {"spawn_rate": (1600, 2800, 4200), "speed_mult": 1.6,  "fly_chance": 0.10},  
+    6: {"spawn_rate": (1300, 2500, 3800), "speed_mult": 1.8,  "fly_chance": 0.13},   
+    7: {"spawn_rate": (1000, 2100, 3400), "speed_mult": 2.0,  "fly_chance": 0.17},   
 }
 
 def go_to_page(page_name):
-    """Switch to a new page and hide any popup."""
     global current_page
     hide_popup()  
     current_page = page_name
@@ -585,7 +558,7 @@ gold_multiplier = 1
 global score_multiplier
 score_multiplier = 1 
 powerUpOwned = {"powerUp1": 0, "powerUp2": 0, "powerUp3": 0, "powerUp4": 0}
-powerUpCost = {"powerUp1": 0, "powerUp2": 150, "powerUp3": 400, "powerUp4": 300}
+powerUpCost = {"powerUp1": 0, "powerUp2": 80, "powerUp3": 200, "powerUp4": 150}
 
 while True:
     dt = min(clock.tick(60) / 1000, 0.05)
@@ -605,13 +578,9 @@ while True:
                         if current_page != BOSSLEVEL:
                             gold += 1 * gold_multiplier
                     powerUpOwned['powerUp4'] -= 1
-
         if current_page == MENU:
             if event.type == pygame.MOUSEBUTTONDOWN:
-                if quitButtonRect.collidepoint(pygame.mouse.get_pos()):
-                    pygame.quit()
-                    sys.exit()
-                elif playButtonRect.collidepoint(pygame.mouse.get_pos()):
+                if playButtonRect.collidepoint(pygame.mouse.get_pos()):
                     killed = 0
                     missed = 0
                     secondsRemaining = 120
@@ -630,15 +599,6 @@ while True:
         elif current_page == GAME:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_pos = pygame.mouse.get_pos()
-
-                if backButtonRect.collidepoint(mouse_pos):
-                    show_score_popup(killed, missed)
-                    boats.empty()
-                    current_page = MENU
-                    try:
-                        scorePage(killed=killed)
-                    except:
-                        pass
 
                 for boat in boats:
                     if boat.rect.collidepoint(mouse_pos):
@@ -679,14 +639,6 @@ while True:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_pos = pygame.mouse.get_pos()
 
-                if backButtonRect.collidepoint(mouse_pos):
-                    show_score_popup(killed, missed)
-                    boats.empty()
-                    current_page = MENU
-                    try:
-                        scorePage(killed=killed)
-                    except:
-                        pass
 
                 for boat in boats:
                     if boat.rect.collidepoint(mouse_pos):
@@ -757,7 +709,7 @@ while True:
     if current_page == MENU:
         draw_menu()
     elif current_page == GAME:
-        draw_game()           # no dt passed anymore
+        draw_game()       
     elif current_page == BOSSLEVEL:
         draw_boss_level()
     elif current_page == SHOP:
