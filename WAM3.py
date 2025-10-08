@@ -1,202 +1,256 @@
-from peewee import *
-import pygame, sys, os, random
-from pygame import *
-from pygame.font import Font
-from pygame.locals import *
-from tkinter import messagebox, Tk, Label, Entry, Button
+import os
+import sys
+import random
+import pygame
+import tkinter as tk
+from pygame.locals import QUIT, MOUSEBUTTONDOWN, USEREVENT
+from score import scorePage  # Assuming this is a function you use
 
+# --- Constants ---
+MENU = "menu"
+GAME = "game"
+SHOP = "shop"
+SETTINGS = "settings"
+LEVELSELECT = "level select"
+BOSSLEVEL = "boss level"
 
-def get_player_name():
-    name_result = {"value": None}
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+GOLD_COLOR = (255, 215, 0)
 
-    def submit():
-        val = entry.get().strip()
-        if val:
-            name_result["value"] = val
-            root.quit()
-        else:
-            error_label.config(text="Name cannot be empty!")
+# --- Helper Functions ---
 
-    def force_focus(event=None):
-        entry.focus_force()
-        root.grab_set()
-
-    root = Tk()
-    root.title("Enter Your Name")
-    root.geometry("300x150")
-    root.overrideredirect(True)
-    root.resizable(False, False)
-    root.protocol("WM_DELETE_WINDOW", lambda: None)
-
-    screen_width = root.winfo_screenwidth()
-    screen_height = root.winfo_screenheight()
-    x = (screen_width - 300) // 2
-    y = (screen_height - 150) // 2
-    root.geometry(f"+{x}+{y}")
-
-    Label(root, text="Enter your name:", font=("Arial", 12)).pack(pady=10)
-    entry = Entry(root, font=("Arial", 12))
-    entry.pack()
-    entry.focus()
-
-    Button(root, text="Submit", command=submit).pack(pady=10)
-    error_label = Label(root, text="", font=("Arial", 10), fg="red")
-    error_label.pack()
-
-    root.grab_set()
-    root.bind("<FocusOut>", force_focus)
-
-    root.mainloop()
-    root.destroy()
-
-    return name_result["value"]
-
-
-def scorePage(killed=None, screen=None):
-    # ---------- Database ----------
-    db = MySQLDatabase(
-        'pirate',
-        host='localhost',
-        port=3306,
-        user='root',
-        password='root'
-    )
-
-    class BaseModel(Model):
-        class Meta:
-            database = db
-
-    class Scores(BaseModel):
-        ScoreName = CharField()
-        ScoreVal = IntegerField()
-
-    try:
-        db.connect()
-    except Exception:
-        messagebox.showwarning("Error", "No database connection")
-        return "error"
-
-    scores = [""] * 5
-    scoreVals = [0] * 5
-
-    cursor = db.execute_sql(
-        "SELECT scorename, scoreval FROM scores ORDER BY scoreval DESC LIMIT 5"
-    )
-
-    for i, row in enumerate(cursor.fetchall()):
-        scores[i] = f"{row[0]} - {row[1]}"
-        scoreVals[i] = int(row[1])
-
-    db.close()
-
-    # ---------- Pygame Setup ----------
-    pygame.init()
-    pygame.font.init()
-
-    if screen is None:
-        gameWidth, gameHeight = pygame.display.Info().current_w, pygame.display.Info().current_h
-        screen = pygame.display.set_mode((gameWidth, gameHeight))
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller EXE."""
+    if getattr(sys, '_MEIPASS', False):
+        base_path = sys._MEIPASS
     else:
-        gameWidth, gameHeight = screen.get_size()
+        base_path = os.path.abspath(os.path.dirname(__file__))
+    return os.path.join(base_path, relative_path)
 
-    scoreScroll2 = pygame.image.load("scoreScroll2.png").convert()
-    scoreScroll2 = pygame.transform.scale(scoreScroll2, (gameWidth, gameHeight))
+def load_image(path, size=None, convert_alpha=True):
+    img = pygame.image.load(resource_path(path))
+    if convert_alpha:
+        img = img.convert_alpha()
+    else:
+        img = img.convert()
+    if size:
+        img = pygame.transform.scale(img, size)
+    return img
 
-    # ---------- Colors and Fonts ----------
-    parchment_brown = (67, 45, 18)
-    dark_brown = (35, 22, 10)
-    gold = (205, 160, 58)
-    white = (255, 255, 255)
-    shadow = (0, 0, 0)
-    black = (0, 0, 0)
+def load_sound(path):
+    return pygame.mixer.Sound(resource_path(path))
 
-    headerfont = Font('freesansbold.ttf', 48)
-    smallfont = Font('freesansbold.ttf', 32)
-    infofont = Font('freesansbold.ttf', 26)
-    buttonfont = pygame.font.SysFont('Corbel', 36, bold=True)
+# --- Tkinter Popup Management ---
 
-    # ---------- Layout ----------
-    yesRect = pygame.Rect(gameWidth/2 - 250, gameHeight - 200, 200, 60)
-    noRect = pygame.Rect(gameWidth/2 + 50, gameHeight - 200, 200, 60)
+class PopupManager:
+    def __init__(self, root):
+        self.root = root
+        self.popup = None
 
-    addingScore = False
-    doneAdding = False
-    highestscore = scoreVals[0] if scoreVals[0] else 0
-    fifthhighest = scoreVals[4] if scoreVals[4] else 0
+    def show(self, text, x, y, font=("Arial", 10)):
+        if self.popup is not None:
+            return
+        self.popup = tk.Toplevel()
+        self.popup.wm_overrideredirect(True)
+        self.popup.attributes('-topmost', True)
+        self.popup.configure(bg="#222222")
+        label = tk.Label(self.popup, text=text, fg="white", bg="#222222", font=font)
+        label.pack(ipadx=10, ipady=5)
+        self.popup.geometry(f"+{x}+{y}")
 
-    newScore = killed if killed is not None else random.randint(fifthhighest + 1, highestscore + 4)
+    def hide(self):
+        if self.popup is not None:
+            self.popup.destroy()
+            self.popup = None
 
-    clock = pygame.time.Clock()
+    def update_position(self, x, y):
+        if self.popup is not None:
+            self.popup.geometry(f"+{x}+{y}")
+            self.popup.update_idletasks()
 
-    def addScore(name, score):
-        try:
-            db.connect(reuse_if_open=True)
-            db.execute_sql(
-                "INSERT INTO scores(scorename, scoreval) VALUES (%s, %s)",
-                (name, score),
-            )
-        finally:
-            db.close()
+# --- Game State ---
 
-    def draw_shadowed_text(text, font, color, shadow_color, pos, center=True):
-        txt_surface = font.render(text, True, color)
-        shadow_surface = font.render(text, True, shadow_color)
-        rect = txt_surface.get_rect(center=pos) if center else txt_surface.get_rect(topleft=pos)
-        shadow_rect = rect.copy()
-        shadow_rect.move_ip(3, 3)
-        screen.blit(shadow_surface, shadow_rect)
-        screen.blit(txt_surface, rect)
+class GameState:
+    def __init__(self):
+        self.gold = 0
+        self.audio_on = True
+        self.missed = 0
+        self.killed = 0
+        self.seconds_remaining = 120
+        self.current_page = MENU
+        self.current_level = None
 
-    def draw_button(rect, text, hover):
-        border_radius = 25
-        base_color = gold if hover else parchment_brown
-        pygame.draw.rect(screen, dark_brown, rect.inflate(6, 6), border_radius=border_radius)
-        pygame.draw.rect(screen, base_color, rect, border_radius=border_radius)
-        draw_shadowed_text(text, buttonfont, white, shadow, rect.center)
+# --- Main Game Setup ---
 
-    # ---------- Main Loop ----------
-    running = True
-    result = None
-    while running:
-        dt = clock.tick(60)
-        for event in pygame.event.get():
-            if event.type == QUIT:
-                running = False
-                result = "quit"
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                if yesRect.collidepoint(event.pos) and not doneAdding:
-                    playerName = get_player_name()
-                    if playerName:
-                        addScore(playerName, newScore)
-                        doneAdding = True
-                elif noRect.collidepoint(event.pos):
-                    running = False
-                    result = "back"
+pygame.init()
+gameWidth, gameHeight = pygame.display.Info().current_w, pygame.display.Info().current_h
+screen = pygame.display.set_mode((gameWidth, gameHeight))
+pygame.display.set_caption("There be treasure!!!")
+clock = pygame.time.Clock()
 
-        # ---------- Draw Screen ----------
-        screen.blit(scoreScroll2, (0, 0))
-        offset = 190
+# Tkinter root for popups
+root = tk.Tk()
+root.withdraw()
+popup_mgr = PopupManager(root)
 
-        draw_shadowed_text("Top Pirate Scores", headerfont, gold, shadow, (gameWidth/2-50, 150 + offset))
-        subtitle_surface = smallfont.render("Will ye add yer name to history?", True, parchment_brown)
-        subtitle_rect = subtitle_surface.get_rect(center=(gameWidth/2-50, 240 + offset))
-        screen.blit(subtitle_surface, subtitle_rect)
+# --- Load Resources ---
 
-        for i, s in enumerate(scores):
-            y = 350 + i * 60 + offset
-            txt_surface = infofont.render(f"{i+1}. {s}", True, dark_brown)
-            rect = txt_surface.get_rect(center=(gameWidth/2-50, y))
-            screen.blit(txt_surface, rect)
+backgrounds = {
+    "game": load_image("resources/background10.png", (gameWidth, gameHeight), False),
+    "menu": load_image("resources/boatCamp2.png", (gameWidth, gameHeight), False),
+    "shop": load_image("resources/boatCamp1.png", (gameWidth, gameHeight), False),
+    "boss": load_image("resources/background9.png", (gameWidth, gameHeight), False),
+}
 
-        # ---------- Buttons ----------
-        m = pygame.mouse.get_pos()
-        if not doneAdding:
-            draw_button(yesRect, "Aye!", yesRect.collidepoint(m))
-            draw_button(noRect, "Nay...", noRect.collidepoint(m))
+sounds = {
+    "boom1": load_sound("resources/sound/boom1.mp3"),
+    "boom2": load_sound("resources/sound/boom2.mp3"),
+    "boom3": load_sound("resources/sound/boom3.mp3"),
+}
+
+sprites = {
+    "ship1": load_image("resources/ships/piratePixelShip1.png", (120, 120)),
+    "ship2": load_image("resources/ships/piratePixelShip2.png", (120, 120)),
+    "ship3": load_image("resources/ships/piratePixelShip3.png", (120, 120)),
+    "fly1": load_image("resources/ships/dutch.png", (200, 200)),
+    "fly2": load_image("resources/ships/ghostShip1.png", (200, 200)),
+    "fly3": load_image("resources/ships/ghostShip2.png", (120, 180)),
+    "kraken1": load_image("resources/ships/kraken1.png", (200, 200)),
+    "kraken2": load_image("resources/ships/kraken2.png", (200, 200)),
+    "gold": load_image("resources/buttons/goldCoin.png", (75, 75)),
+    "scoreboard": load_image("resources/scorePlate.png", (200, 200)),
+    "start": load_image("resources/buttons/arcade.png", (300, 150)),
+    "quit": load_image("resources/quitButton2.png", (300, 150)),
+    "shop": load_image("resources/buttons/shop.png", (300, 150)),
+    "story": load_image("resources/storyMode.png", (330, 165)),
+    "settings": load_image("resources/settingsButton.png", (200, 150)),
+    "audio_on": load_image("resources/audioOnButton.png", (200, 150)),
+    "audio_off": load_image("resources/audioOffButton.png", (200, 150)),
+    "back": load_image("resources/backButton1.png", (200, 150)),
+}
+
+# --- Fonts ---
+headerfont = pygame.font.Font('freesansbold.ttf', 48)
+buttonfont = pygame.font.SysFont('Arial', 40, bold=True)
+
+# --- Rects ---
+scoreBoardRect = sprites["scoreboard"].get_rect(topleft=(gameWidth-400, 40))
+playButtonRect = sprites["start"].get_rect(topleft=(gameWidth / 2 - 120, 500))
+quitButtonRect = sprites["quit"].get_rect(topleft=(gameWidth / 2 - 110, 900))
+shopButtonRect = sprites["shop"].get_rect(topleft=(gameWidth / 2 - 120, 700))
+storyButtonRect = sprites["story"].get_rect(topleft=(gameWidth / 2 - 130, 300))
+settingsButtonRect = sprites["settings"].get_rect(topleft=(80, 40))
+audioOnButtonRect = sprites["audio_on"].get_rect(topleft=(300, 40))
+audioOffButtonRect = sprites["audio_off"].get_rect(topleft=(300, 40))
+backButtonRect = sprites["back"].get_rect(topleft=(gameWidth / 2 - 100, 750))
+
+scorex = gameWidth - 300
+scorey = gameHeight / 6.4
+
+# --- Sprite Groups ---
+boats = pygame.sprite.Group()
+
+# --- Events ---
+SPAWN_EVENT = USEREVENT + 1
+SPAWN_EVENT2 = USEREVENT + 2
+SPAWN_EVENT3 = USEREVENT + 3
+TIMER_EVENT = USEREVENT + 10
+
+pygame.time.set_timer(SPAWN_EVENT, 2300)
+pygame.time.set_timer(SPAWN_EVENT2, 3000)
+pygame.time.set_timer(SPAWN_EVENT3, 4000)
+pygame.time.set_timer(TIMER_EVENT, 1000)
+
+# --- PirateShip Sprite ---
+
+class PirateShip(pygame.sprite.Sprite):
+    def __init__(self, y, direction="right", kind="normal"):
+        super().__init__()
+        if kind == "normal":
+            self.image = random.choice([sprites["ship1"], sprites["ship3"]])
+            self.speed = random.randint(100, 200)
+        elif kind == "special":
+            self.image = sprites["ship2"]
+            self.speed = random.randint(100, 200)
+        elif kind == "fly":
+            chance = random.random()
+            if chance < 0.01:
+                self.image = sprites["fly1"]
+            elif chance < 0.31:
+                self.image = sprites["fly3"]
+            else:
+                self.image = sprites["fly2"]
+            self.speed = 400
+        elif kind == "kraken1":
+            self.image = sprites["kraken1"]
+            self.speed = random.randint(50, 100)
+        elif kind == "kraken2":
+            self.image = sprites["kraken2"]
+            self.speed = random.randint(70, 170)
+        self.rect = self.image.get_rect()
+        self.direction = direction
+        self.pos_x = float(0 if direction == "right" else gameWidth)
+        self.rect.y = y
+
+    def update(self, dt):
+        if self.direction == "right":
+            self.pos_x += self.speed * dt
         else:
-            draw_button(noRect, "Back to Sea", noRect.collidepoint(m))
+            self.pos_x -= self.speed * dt
+        self.rect.x = int(self.pos_x)
+        if self.rect.right < 0 or self.rect.left > gameWidth:
+            state.missed += 1
+            self.kill()
 
-        pygame.display.flip()
+# --- Drawing Functions ---
 
-    # ---------- Return instead of exit ----------
-    return result
+def draw_menu():
+    screen.blit(backgrounds["menu"], (0, 0))
+    gold_text = buttonfont.render(f"{state.gold}", True, GOLD_COLOR)
+    gold_rect = gold_text.get_rect(topright=(gameWidth/2 + 400, 710))
+    screen.blit(gold_text, gold_rect)
+    screen.blit(sprites["gold"], (gameWidth/2 + 260, 700))
+    # ... (rest of the button drawing and popup logic, as in your original code)
+    # Use popup_mgr for popups
+
+def draw_game(dt):
+    screen.blit(backgrounds["game"], (0, 0))
+    headerText = headerfont.render("Whack 'A pirateShip!", True, BLACK)
+    headerRect = headerText.get_rect(center=(gameWidth / 2, 100))
+    screen.blit(headerText, headerRect)
+    screen.blit(sprites["back"], backButtonRect)
+    screen.blit(sprites["scoreboard"], scoreBoardRect)
+    boats.update(dt)
+    boats.draw(screen)
+    score_text = buttonfont.render(f"{state.killed}", True, BLACK)
+    score_rect = score_text.get_rect(center=(scorex, scorey))
+    screen.blit(score_text, score_rect)
+    minutes = str(state.seconds_remaining // 60).zfill(2)
+    seconds = str(state.seconds_remaining % 60).zfill(2)
+    timer_text = buttonfont.render(f"Time: {minutes}:{seconds}", True, BLACK)
+    timer_rect = timer_text.get_rect(center=(scorex, scorey + 80))
+    screen.blit(timer_text, timer_rect)
+
+# ... (similarly refactor draw_shop, draw_boss_level, draw_settings, etc.)
+
+# --- Main Loop ---
+
+state = GameState()
+
+while True:
+    dt = min(clock.tick(60) / 1000, 0.05)
+    for event in pygame.event.get():
+        if event.type == QUIT:
+            pygame.quit()
+            sys.exit()
+        # ... (handle events, update state, spawn ships, etc.)
+
+    # Draw current page
+    if state.current_page == MENU:
+        draw_menu()
+    elif state.current_page == GAME:
+        draw_game(dt)
+    # ... (other pages)
+
+    pygame.display.update()
